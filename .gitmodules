@@ -1,3 +1,9 @@
 [submodule "Dependencies/HiteModLoader"]
 	path = Dependencies/HiteModLoader
 	url = https://github.com/thesupersonic16/HiteModLoader
+[submodule "Dependencies/ManiaAPI"]
+	path = Dependencies/ManiaAPI
+	url = https://github.com/thesupersonic16/ManiaAPI
+[submodule "Dependencies/mania-mod-loader"]
+	path = Dependencies/mania-mod-loader
+	url = https://github.com/sonicretro/mania-mod-loader
