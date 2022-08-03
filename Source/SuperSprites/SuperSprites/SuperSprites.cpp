@@ -156,7 +156,7 @@ extern "C"
     __declspec(dllexport) void Init(const char* path)
     {
         // Setup
-        BYTE patch[]{ 0x83, 0xC4, 0x04, 0xEB, 0x1A };
+        BYTE patch[] { 0x83, 0xC4, 0x04, 0xEB, 0x1A };
         WriteData((BYTE*)(baseAddress + 0x000C84D0), (BYTE)0x56);        // push esi - player
         WriteCall((void*)(baseAddress + 0x000C84D1), SetupSuperSprites); // call SetupSuperSprites
         WriteData((BYTE*)(baseAddress + 0x000C84D6), patch);             // add esi, 4
