@@ -1,0 +1,5 @@
+add Stock Palettes/SuperAmyPalette.act
+add Stock Palettes/SuperAmyPalette_Water1.act
+add Stock Palettes/SuperAmyPalette_Water2.act
+add OriginsPlayerPatcher.dll
+add mod.ini
