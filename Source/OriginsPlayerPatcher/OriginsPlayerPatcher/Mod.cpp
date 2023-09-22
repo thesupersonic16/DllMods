@@ -35,6 +35,21 @@ struct ObjectPlayer
 
 bool Dumped = false;
 ModLoader* ModLoaderData;
+ObjectPlayer* Player;
+
+// Specific player palattes 
+unsigned int SuperKnuxPalette_WaterHCZ[33];
+unsigned int SuperKnuxPalette_WaterICZ[33];
+
+bool CheckFile(const char* path)
+{
+	char fullPath[0x400]{};
+	memset(fullPath, 0, sizeof(fullPath));
+	ModLoaderData->GetRedirectedPath(path, fullPath);
+	if (fullPath[0] == 0)
+		return false;
+	return true;
+}
 
 void SavePalette(const char* path, unsigned int* palette, int count)
 {
@@ -55,7 +70,7 @@ void SavePalette(const char* path, unsigned int* palette, int count)
 	}
 }
 
-void LoadPalette(const char* path, unsigned int* palette, int count)
+bool LoadPalette(const char* path, unsigned int* palette, int count)
 {
 	char data[0x300]{};
 	char fullPath[0x400]{};
@@ -76,26 +91,46 @@ void LoadPalette(const char* path, unsigned int* palette, int count)
 	memset(fullPath, 0, sizeof(fullPath));
 	ModLoaderData->GetRedirectedPath(path, fullPath);
 	if (fullPath[0] == 0)
-		return;
+		return false;
 	err = fopen_s(&file, fullPath, "rb");
-	if (!err)
+	if (err)
+		return false;
+
+	printf("[PlayerPatcher] Loading Palette from %s\n", path);
+	fread(data, 3, 0x100, file);
+	fclose(file);
+	for (int i = 0; i < count; i++)
 	{
-		printf("[PlayerPatcher] Loading Palette from %s\n", path);
-		fread(data, 3, 0x100, file);
-		fclose(file);
-		for (int i = 0; i < count; i++)
-		{
-			auto color = (char*)&palette[i];
-			*(color + 2) = data[i * 3 + 0];
-			*(color + 1) = data[i * 3 + 1];
-			*(color + 0) = data[i * 3 + 2];
-		}
+		auto color = (char*)&palette[i];
+		*(color + 2) = data[i * 3 + 0];
+		*(color + 1) = data[i * 3 + 1];
+		*(color + 0) = data[i * 3 + 2];
 	}
+	return true;
 }
+
+// Specific player palattes 
+HOOK(void, __fastcall, HCZSetup_StageLoad, SigHCZSetup_StageLoad(), void* obj)
+{
+	originalHCZSetup_StageLoad(obj);
+	if (LoadPalette("SuperKnuxPalette_WaterHCZ.act", SuperKnuxPalette_WaterHCZ, sizeof(SuperKnuxPalette_WaterHCZ) / 4))
+		Player->activeSuperKnuxPalette_Water = SuperKnuxPalette_WaterHCZ;
+}
+
+HOOK(void, __fastcall, ICZSetup_StageLoad, SigICZSetup_StageLoad(), void* obj)
+{
+	originalICZSetup_StageLoad(obj);
+	if (LoadPalette("SuperKnuxPalette_WaterICZ.act", SuperKnuxPalette_WaterICZ, sizeof(SuperKnuxPalette_WaterICZ) / 4))
+		Player->activeSuperKnuxPalette_Water = SuperKnuxPalette_WaterICZ;
+}
+
 
 HOOK(ObjectPlayer*, __fastcall, Player_StaticLoad, SigPlayer_StaticLoad(), ObjectPlayer* playerVars)
 {
 	originalPlayer_StaticLoad(playerVars);
+
+	// Store player object
+	Player = playerVars;
 
 	// Load palettes
 	LoadPalette("SuperSonicPalette.act", playerVars->superSonicPalette, sizeof(playerVars->superSonicPalette) / 4);
@@ -135,5 +170,10 @@ extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
 	}
 
 	INSTALL_HOOK(Player_StaticLoad);
+
+	// Specific zone palettes
+	INSTALL_HOOK(HCZSetup_StageLoad);
+	INSTALL_HOOK(ICZSetup_StageLoad);
+
 	ModLoaderData = modInfo->ModLoader;
 }
