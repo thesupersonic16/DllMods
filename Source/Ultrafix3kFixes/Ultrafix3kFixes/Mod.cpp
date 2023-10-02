@@ -5,6 +5,7 @@
 
 // Thanks Mania/RSSDKv5 decomp team for giving away such valuable information without permission.
 typedef int int32;
+typedef int uint32;
 typedef short int16;
 typedef unsigned short uint16;
 typedef unsigned char uint8;
@@ -39,7 +40,6 @@ struct __declspec(align(8)) StateMachine
     char field_E;
     char priority;
 };
-
 
 struct Entity
 {
@@ -99,7 +99,6 @@ struct EntityCamera : Entity
     int32 boundsB;
 };
 
-
 struct EntityPlayer : Entity
 {
     char padding0[160];
@@ -146,8 +145,32 @@ struct ObjectZone
 	int32 playerBoundsT[4];
 };
 
-// Too lazy to sig scan this
+struct InputState
+{
+    bool32 down;
+    bool32 press;
+    int32 keyMap;
+};
+
+struct ControllerState
+{
+    InputState keyUp;
+    InputState keyDown;
+    InputState keyLeft;
+    InputState keyRight;
+    InputState keyA;
+    InputState keyB;
+    InputState keyC;
+    InputState keyX;
+    InputState keyY;
+    InputState keyZ;
+    InputState keyStart;
+    InputState keySelect;
+};
+
+// Too lazy to sig scan these
 ObjectZone** Zone = (ObjectZone**)0x143DB5240;
+ControllerState* controllers = (ControllerState*)0x143728FF0;
 
 HOOK(void, __fastcall, Player_State_KnuxGlideLeft, SigPlayer_State_KnuxGlideLeft(), EntityPlayer* _this)
 {
@@ -171,7 +194,52 @@ HOOK(void, __fastcall, sub_1401EA5E0, Sigsub_1401EA5E0(), EntityPlayer* player)
     originalsub_1401EA5E0(player);
 }
 
+HOOK(bool *, __fastcall, sub_1403A2550, Sigsub_1403A2550(), uint32 deviceID)
+{
+    auto inputs = originalsub_1403A2550(deviceID);
+    bool mirror = ((bool(__fastcall*)())(SigIsMirrorMode()))();
 
+    if (deviceID == 0)
+    {
+        controllers[0].keyUp.press    = inputs[0];
+        controllers[0].keyDown.press  = inputs[1];
+        controllers[0].keyLeft.press  = inputs[2];
+        controllers[0].keyRight.press = inputs[3];
+        controllers[0].keyA.press     = inputs[4];
+        controllers[0].keyB.press     = inputs[5];
+        controllers[0].keyC.press     = inputs[6];
+        controllers[0].keyStart.press = inputs[20];
+    
+        controllers[1].keyUp.press     = inputs[10] | inputs[0];
+        controllers[1].keyDown.press   = inputs[11] | inputs[1];
+        controllers[1].keyLeft.press   = inputs[12] | inputs[2];
+        controllers[1].keyRight.press  = inputs[13] | inputs[3];
+        controllers[1].keyA.press      = inputs[14];
+        controllers[1].keyB.press      = inputs[15];
+        controllers[1].keyC.press      = inputs[16];
+        controllers[1].keyX.press      = inputs[17];
+        controllers[1].keyY.press      = inputs[18];
+        controllers[1].keyZ.press      = inputs[19];
+        controllers[1].keyStart.press  = inputs[20];
+        controllers[1].keySelect.press = inputs[21];
+
+        if (mirror)
+        {
+            bool buffer = controllers[1].keyLeft.press;
+            controllers[1].keyLeft.press = controllers[1].keyRight.press;
+            controllers[1].keyRight.press = buffer;
+        }
+
+        // TODO: Not sure what this does, but from what it looks,
+        //  it may only affect v4 and v3
+        //sub_140101BC0(21);
+    }
+
+    // Intentionally fail if id is 0
+    if (deviceID == 0)
+        return nullptr;
+    return inputs;
+}
 
 extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
 {
@@ -184,4 +252,5 @@ extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
 
 	INSTALL_HOOK(Player_State_KnuxGlideLeft);
     INSTALL_HOOK(sub_1401EA5E0);
+    INSTALL_HOOK(sub_1403A2550);
 }
