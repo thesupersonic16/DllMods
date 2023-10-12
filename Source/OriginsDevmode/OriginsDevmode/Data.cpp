@@ -16,3 +16,7 @@ void*& devmenuState = *(void**)0x1433626E0;
 SceneInfo& sceneInfo = *(SceneInfo*)0x143DB0A40;
 ScreenInfo* screens = (ScreenInfo*)0x1434C3800;
 bool32* drawGroupVisible = (bool32*)0x1434BF780;
+RetroStates& gameMode = *(RetroStates*)0x1428ED498;
+StageModes& stageMode = *(StageModes*)0x142C64230;
+int32& gameSpeed = *(int32*)0x142855AF4;
+bool& frameStep = *(bool*)0x14337FEE1;

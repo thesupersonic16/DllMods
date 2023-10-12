@@ -392,12 +392,12 @@ enum EngineStates {
 #endif
 };
 
-enum RetroStates {
-    ENGINE_DEVMENU = 0,
-    ENGINE_MAINGAME = 1,
-    ENGINE_INITDEVMENU = 2,
-
-    ENGINE_SCRIPTERROR = 4,
+enum RetroStates : uint8 {
+    ENGINE_WAIT,
+    ENGINE_MAINGAME,
+    ENGINE_INITDEVMENU,
+    ENGINE_A,
+    ENGINE_SCRIPTERROR
 };
 
 enum StageModes {
@@ -505,6 +505,16 @@ typedef enum {
     VIEWVAR_DISPLAY_SIGNED,
 } DebugVarDisplayTypes;
 
+enum PrintModes {
+    PRINT_NORMAL,
+    PRINT_POPUP,
+    PRINT_ERROR,
+    PRINT_FATAL,
+#if RETRO_REV0U
+    PRINT_SCRIPTERR,
+#endif
+};
+
 extern ControllerState* controller;
 extern uint8& engineVersion;
 extern ScreenInfo** currentScreen_ptr;
@@ -518,3 +528,7 @@ extern void*& devmenuState;
 extern SceneInfo& sceneInfo;
 extern ScreenInfo* screens;
 extern bool32* drawGroupVisible;
+extern RetroStates& gameMode;
+extern StageModes& stageMode;
+extern int32& gameSpeed;
+extern bool& frameStep;

@@ -20,7 +20,52 @@ bool fastButtonPressed = false;
 bool functionButtonPressed[12]{};
 int stepTimer = 0;
 
+bool printWorkaround = false;
 bool showPaletteOverlay = false;
+
+uint32 GetPaletteEntry(uint8 bankID, uint8 index)
+{
+	switch (engineVersion)
+	{
+	default:
+		return 0;
+	case 5:
+		return ((uint32(__fastcall*)(uint8 bankID, uint8 index))(FunctionTable[FunctionTable_GetPaletteEntry]))(bankID, index);
+	case 4:
+	case 3:
+		auto legacyPalette = (uint16*)0x14292E4D0;
+		auto clr = legacyPalette[256 * bankID + index];
+
+		int32 R = (clr & 0xF800) << 8;
+		int32 G = (clr & 0x7E0) << 5;
+		int32 B = (clr & 0x1F) << 3;
+		return R | G | B;
+	}
+}
+
+void DrawDebug()
+{
+	if (showPaletteOverlay)
+	{
+		// Use first screen
+		*currentScreen_ptr = &screens[0];
+		auto DrawRectangle = (void(__fastcall*)(int32 x, int32 y, int32 width, int32 height, uint32 color, int32 alpha, int32 inkEffect, bool32 screenRelative))(SigDrawRectangle());
+
+		for (int32 p = 0; p < 8; ++p)
+		{
+			int32 x = 424 - 128;
+			int32 y = 240 - 64;
+
+			for (int32 i = 0; i < 16 * 16; ++i)
+			{
+				uint32 clr = GetPaletteEntry(p, i);
+
+				DrawRectangle(x + (i & 0xF) * 2 + (p % 4) * 32,
+					y + ((i >> 4) << 1) + ((p / 4) * 32), 2, 2, clr, 0xFF, INK_NONE, true);
+			}
+		}
+	}
+}
 
 // The engine normally clears the variables,
 //  but since it does not use the function table it got nuked
@@ -43,31 +88,34 @@ HOOK(void, __fastcall, InitObjects, SigInitObjects())
 HOOK(void, __fastcall, ProcessObjectDrawLists, SigProcessObjectDrawLists())
 {
 	originalProcessObjectDrawLists();
-
-	if (showPaletteOverlay)
-	{
-		// Use first screen
-		*currentScreen_ptr = &screens[0];
-		auto GetPaletteEntry = (uint32(__fastcall*)(uint8 bankID, uint8 index))(FunctionTable[FunctionTable_GetPaletteEntry]);
-		auto DrawRectangle = (void(__fastcall*)(int32 x, int32 y, int32 width, int32 height, uint32 color, int32 alpha, int32 inkEffect, bool32 screenRelative))(SigDrawRectangle());
-
-		for (int32 p = 0; p < 8; ++p)
-		{
-			int32 x = 424 - 128;
-			int32 y = 240 - 64;
-
-			for (int32 i = 0; i < 16 * 16; ++i)
-			{
-				uint32 clr = GetPaletteEntry(p, i);
-
-				DrawRectangle(x + (i & 0xF) * 2 + (p % 4) * 32,
-					y + ((i >> 4) << 1) + ((p / 4) * 32), 2, 2, clr, 0xFF, INK_NONE, true);
-			}
-		}
-	}
-
+	DrawDebug();
 }
 
+HOOK(void, __fastcall, ProcessStagev3, SigProcessStagev3())
+{
+	if (sceneInfo.state & ENGINESTATE_STEPOVER && !frameStep)
+		return;
+	else if (sceneInfo.state & ENGINESTATE_STEPOVER && frameStep)
+		frameStep = false;
+
+	originalProcessStagev3();
+	for (int i = 1; i < gameSpeed; ++i)
+		originalProcessStagev3();
+	DrawDebug();
+}
+
+HOOK(void, __fastcall, ProcessStagev4, SigProcessStagev4())
+{
+	if (sceneInfo.state & ENGINESTATE_STEPOVER && !frameStep)
+		return;
+	else if (sceneInfo.state & ENGINESTATE_STEPOVER && frameStep)
+		frameStep = false;
+
+	originalProcessStagev4();
+	for (int i = 1; i < gameSpeed; ++i)
+		originalProcessStagev4();
+	DrawDebug();
+}
 
 HOOK(void, __fastcall, StartGameObjects, SigStartGameObjects())
 {
@@ -78,8 +126,74 @@ HOOK(void, __fastcall, StartGameObjects, SigStartGameObjects())
 	FunctionTable[FunctionTable_SetDebugValue] = AddViewableVariable;
 }
 
+// Workaround the mod loader
+HOOK(void, __fastcall, PrintLog, ((intptr_t)SigPrintLog_() - 0x05), PrintModes printMode, const char* format, const char* p1, const char* p2, const char* p3)
+{
+	if (printMode == PRINT_SCRIPTERR)
+	{
+		sprintf_s(scriptErrorMessage, format, p1, p2, p3);
+		
+		// No need to report back to the mod loader
+		return;
+	}
+
+	originalPrintLog(printMode, format, p1, p2, p3);
+}
+
+void RestartStage()
+{
+	switch (engineVersion)
+	{
+	case 5:
+		sceneInfo.state = ENGINESTATE_LOAD;
+		break;
+	case 4:
+	case 3:
+		gameMode = ENGINE_MAINGAME;
+		stageMode = STAGEMODE_LOAD;
+		break;
+	default:
+		break;
+	}
+}
+
+extern "C" __declspec(dllexport) void OnFrame()
+{
+	// Make sure to install the hook after the mod loader
+	if (!printWorkaround)
+	{
+		INSTALL_HOOK(PrintLog);
+		printWorkaround = true;
+	}
+}
+
 extern "C" __declspec(dllexport) void OnRsdkFrame()
 {
+	// Process script error
+	if ((engineVersion == 3 || engineVersion == 4)
+		&& sceneInfo.state != ENGINESTATE_DEVMENU
+		&& gameMode == ENGINE_SCRIPTERROR)
+	{
+		DisplayScriptError();
+
+		if (controller->keyStart.press || controller->keyA.press)
+		{
+			OpenDevMenu();
+		}
+		else if (controller->keyB.press)
+		{
+			sceneInfo.activeCategory = 0;
+			gameMode = ENGINE_MAINGAME;
+			stageMode = STAGEMODE_LOAD;
+			sceneInfo.listPos = 0;
+		}
+		else if (controller->keyC.press)
+		{
+			gameMode = ENGINE_INITDEVMENU;
+			stageMode = STAGEMODE_LOAD;
+		}
+	}
+
 	// Toggle dev menu
 	bool devButtonDown = GetAsyncKeyState(VK_OEM_3) != 0;
 	if (devButtonDown && !devButtonPressed)
@@ -94,103 +208,99 @@ extern "C" __declspec(dllexport) void OnRsdkFrame()
 	bool fastButtonDown = GetAsyncKeyState(VK_BACK) != 0;
 	if (fastButtonDown && !fastButtonPressed)
 	{
-		// You saw nothing
-		*((intptr_t*)0x142855AF4) = 8;
+		gameSpeed = 8;
 		fastButtonPressed = true;
 	}
 	else if (!fastButtonDown && fastButtonPressed)
 	{
-		*((intptr_t*)0x142855AF4) = 1;
+		gameSpeed = 1;
 		fastButtonPressed = false;
 	}
 	else if (!fastButtonDown)
 		fastButtonPressed = false;
 
-	if (engineVersion == 5)
+	// Back scene
+	bool f1ButtonDown = GetAsyncKeyState(VK_F1) != 0;
+	if (f1ButtonDown && !functionButtonPressed[0])
 	{
-		// Back scene
-		bool f1ButtonDown = GetAsyncKeyState(VK_F1) != 0;
-		if (f1ButtonDown && !functionButtonPressed[0])
+		sceneInfo.listPos--;
+		if (sceneInfo.listPos < sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetStart
+			|| sceneInfo.listPos >= sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetEnd)
 		{
-			sceneInfo.listPos--;
-			if (sceneInfo.listPos < sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetStart
-				|| sceneInfo.listPos >= sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetEnd)
-			{
-				sceneInfo.activeCategory--;
-				if (sceneInfo.activeCategory >= sceneInfo.categoryCount)
-					sceneInfo.activeCategory = sceneInfo.categoryCount - 1;
-				sceneInfo.listPos = sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetEnd - 1;
-			}
-			sceneInfo.state = ENGINESTATE_LOAD;
-			functionButtonPressed[0] = true;
+			sceneInfo.activeCategory--;
+			if (sceneInfo.activeCategory >= sceneInfo.categoryCount)
+				sceneInfo.activeCategory = sceneInfo.categoryCount - 1;
+			sceneInfo.listPos = sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetEnd - 1;
 		}
-		else if (!f1ButtonDown)
-			functionButtonPressed[0] = false;
-
-		// Next scene
-		bool f2ButtonDown = GetAsyncKeyState(VK_F2) != 0;
-		if (f2ButtonDown && !functionButtonPressed[1])
-		{
-			sceneInfo.listPos++;
-			if (sceneInfo.listPos >= sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetEnd || sceneInfo.listPos == 0)
-			{
-				sceneInfo.activeCategory++;
-				if (sceneInfo.activeCategory >= sceneInfo.categoryCount)
-					sceneInfo.activeCategory = 0;
-				sceneInfo.listPos = sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetStart;
-			}
-			sceneInfo.state = ENGINESTATE_LOAD;
-			functionButtonPressed[1] = true;
-		}
-		else if (!f2ButtonDown)
-			functionButtonPressed[1] = false;
-
-		// Reload scene
-		bool f5ButtonDown = GetAsyncKeyState(VK_F5) != 0;
-		if (f5ButtonDown && !functionButtonPressed[4])
-		{
-			sceneInfo.state = ENGINESTATE_LOAD;
-			functionButtonPressed[4] = true;
-		}
-		else if (!f5ButtonDown)
-			functionButtonPressed[4] = false;
-
-		// Show palette overlay
-		bool f10ButtonDown = GetAsyncKeyState(VK_F10) != 0;
-		if (f10ButtonDown && !functionButtonPressed[9])
-		{
-			showPaletteOverlay = !showPaletteOverlay;
-			functionButtonPressed[9] = true;
-		}
-		else if (!f10ButtonDown)
-			functionButtonPressed[9] = false;
-
-		// Frame step
-		bool f11ButtonDown = GetAsyncKeyState(VK_F11) != 0;
-		if (f11ButtonDown)
-		{
-			++stepTimer;
-			if (!functionButtonPressed[10] || (stepTimer > 30 && (stepTimer & 1) == 0))
-				(*(bool*)0x14337FEE1) = true;
-			functionButtonPressed[10] = true;
-		}
-		else if (!f11ButtonDown)
-		{
-			stepTimer = 0;
-			functionButtonPressed[10] = false;
-		}
-
-		// Pause
-		bool f12ButtonDown = GetAsyncKeyState(VK_F12) != 0;
-		if (f12ButtonDown && !functionButtonPressed[11])
-		{
-			if (sceneInfo.state != ENGINESTATE_NONE)
-				sceneInfo.state ^= ENGINESTATE_STEPOVER;
-			functionButtonPressed[11] = true;
-		}
-		else if (!f12ButtonDown)
-			functionButtonPressed[11] = false;
+		RestartStage();
+		functionButtonPressed[0] = true;
 	}
+	else if (!f1ButtonDown)
+		functionButtonPressed[0] = false;
+
+	// Next scene
+	bool f2ButtonDown = GetAsyncKeyState(VK_F2) != 0;
+	if (f2ButtonDown && !functionButtonPressed[1])
+	{
+		sceneInfo.listPos++;
+		if (sceneInfo.listPos >= sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetEnd || sceneInfo.listPos == 0)
+		{
+			sceneInfo.activeCategory++;
+			if (sceneInfo.activeCategory >= sceneInfo.categoryCount)
+				sceneInfo.activeCategory = 0;
+			sceneInfo.listPos = sceneInfo.listCategory[sceneInfo.activeCategory].sceneOffsetStart;
+		}
+		RestartStage();
+		functionButtonPressed[1] = true;
+	}
+	else if (!f2ButtonDown)
+		functionButtonPressed[1] = false;
+
+	// Reload scene
+	bool f5ButtonDown = GetAsyncKeyState(VK_F5) != 0;
+	if (f5ButtonDown && !functionButtonPressed[4])
+	{
+		RestartStage();
+		functionButtonPressed[4] = true;
+	}
+	else if (!f5ButtonDown)
+		functionButtonPressed[4] = false;
+
+	// Show palette overlay
+	bool f10ButtonDown = GetAsyncKeyState(VK_F10) != 0;
+	if (f10ButtonDown && !functionButtonPressed[9])
+	{
+		showPaletteOverlay = !showPaletteOverlay;
+		functionButtonPressed[9] = true;
+	}
+	else if (!f10ButtonDown)
+		functionButtonPressed[9] = false;
+
+	// Frame step
+	bool f11ButtonDown = GetAsyncKeyState(VK_F11) != 0;
+	if (f11ButtonDown)
+	{
+		++stepTimer;
+		if (!functionButtonPressed[10] || (stepTimer > 30 && (stepTimer & 1) == 0))
+			frameStep = true;
+		functionButtonPressed[10] = true;
+	}
+	else if (!f11ButtonDown)
+	{
+		stepTimer = 0;
+		functionButtonPressed[10] = false;
+	}
+
+	// Pause
+	bool f12ButtonDown = GetAsyncKeyState(VK_F12) != 0;
+	if (f12ButtonDown && !functionButtonPressed[11])
+	{
+		if (sceneInfo.state != ENGINESTATE_NONE)
+			sceneInfo.state ^= ENGINESTATE_STEPOVER;
+		functionButtonPressed[11] = true;
+	}
+	else if (!f12ButtonDown)
+		functionButtonPressed[11] = false;
 
 }
 
@@ -207,5 +317,7 @@ extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
 	INSTALL_HOOK(LoadSceneFolder);
 	INSTALL_HOOK(InitObjects);
 	INSTALL_HOOK(ProcessObjectDrawLists);
+	INSTALL_HOOK(ProcessStagev3);
+	INSTALL_HOOK(ProcessStagev4);
 	INSTALL_HOOK(StartGameObjects);
 }

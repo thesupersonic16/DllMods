@@ -15,12 +15,30 @@ int32 listPos;
 
 int32 viewableVarCount;
 ViewableVariable viewableVarList[0x100];
+char scriptErrorMessage[0x400];
 
 // Functions
 auto DrawRectangle = (void(__fastcall*)(int32 x, int32 y, int32 width, int32 height, uint32 color, int32 alpha, int32 inkEffect, bool32 screenRelative))(SigDrawRectangle());
 auto NotifyCallback = (void(__fastcall*)(int* args))(SigNotifyCallback());
 
+int32 DevOutput_GetStringYSize(char* string)
+{
+    if (!*string)
+        return 24;
 
+    int32 lineCount = 0;
+    while (*string) {
+        if (*string == '\n')
+            lineCount++;
+
+        ++string;
+    }
+
+    if (lineCount >= 1)
+        return 8 * lineCount + 16;
+    else
+        return 24;
+}
 void DrawDevString(const char* string, int32 x, int32 y, int32 align, uint32 color)
 {
     ScreenInfo* currentScreen = *currentScreen_ptr;
@@ -220,12 +238,14 @@ void DevMenu_MainMenu()
             {
             default: break;
             case 5:
-                sceneInfo.state = ENGINESTATE_LOAD;
                 break;
             case 4:
             case 3:
+                gameMode = ENGINE_MAINGAME;
+                stageMode = STAGEMODE_LOAD;
                 break;
             }
+            sceneInfo.state = ENGINESTATE_LOAD;
             break;
         case 2: // Stage Select
             devmenuState = DevMenu_CategorySelectMenu;
@@ -515,14 +535,19 @@ void DevMenu_SceneSelectMenu()
         switch (engineVersion)
         {
         case 5:
-            sceneInfo.state = ENGINESTATE_LOAD;
             break;
         case 4:
         case 3:
+            gameMode = ENGINE_MAINGAME;
+            stageMode = STAGEMODE_LOAD;
             break;
         default:
             break;
         }
+
+        // Origins uses the v5 state for v3/4 dev menu
+        sceneInfo.state = ENGINESTATE_LOAD;
+
     }
     else if (controller->keyB.press)
     {
@@ -609,6 +634,8 @@ void DevMenu_OptionsMenu()
         switch (selection)
         {
         case 0: // Debug Flags
+            if (engineVersion != 5)
+                break;
             devmenuState = DevMenu_DebugOptionsMenu;
             selection = 0;
             break;
@@ -936,22 +963,15 @@ void DevMenu_DebugOptionsMenu()
 
 void OpenDevMenu()
 {
-    switch (engineVersion)
-    {
-    default: break;
-    case 5:
-        sceneState = sceneInfo.state;
-        sceneInfo.state = ENGINESTATE_DEVMENU;
-        devmenuState = DevMenu_MainMenu;
-        selection = 0;
-        timer = 1;
-        scrollPos = 0;
-        ((void(__fastcall*)())(FunctionTable[FunctionTable_PauseChannel]))();
-        break;
-    case 4:
-    case 3:
-        break;
-    }
+    sceneState = sceneInfo.state;
+    sceneInfo.state = ENGINESTATE_DEVMENU;
+    devmenuState = DevMenu_MainMenu;
+    selection = 0;
+    timer = 1;
+    scrollPos = 0;
+
+    // Pause Channel
+    ((void(__fastcall*)())(0x1400DDE90))();
 }
 
 void CloseDevMenu()
@@ -961,12 +981,14 @@ void CloseDevMenu()
     default: break;
     case 5:
         sceneInfo.state = sceneState;
-        ((void(__fastcall*)())(FunctionTable[FunctionTable_ResumeChannel]))();
         break;
     case 4:
     case 3:
+        sceneInfo.state = ENGINESTATE_LOAD;
         break;
     }
+    // Resume Channel
+    ((void(__fastcall*)())(0x1400DDEE0))();
 }
 
 void ToggleDevMenu()
@@ -1028,4 +1050,11 @@ void AddViewableVariable(const char* name, void* value, int32 type, int32 min, i
         viewVar->min = min;
         viewVar->max = max;
     }
+}
+
+void DisplayScriptError()
+{
+    const ScreenInfo* currentScreen = *currentScreen_ptr;
+    int32 yOff = DevOutput_GetStringYSize(scriptErrorMessage);
+    DrawDevString(scriptErrorMessage, 8, currentScreen->center.y - (yOff >> 1) + 8, 0, 0xF0F0F0);
 }
