@@ -33,7 +33,7 @@ uint32 GetPaletteEntry(uint8 bankID, uint8 index)
 		return ((uint32(__fastcall*)(uint8 bankID, uint8 index))(FunctionTable[FunctionTable_GetPaletteEntry]))(bankID, index);
 	case 4:
 	case 3:
-		auto legacyPalette = (uint16*)0x14292E4D0;
+		auto legacyPalette = (uint16*)0x14292EF70;
 		auto clr = legacyPalette[256 * bankID + index];
 
 		int32 R = (clr & 0xF800) << 8;
@@ -121,7 +121,7 @@ HOOK(void, __fastcall, StartGameObjects, SigStartGameObjects())
 {
 	originalStartGameObjects();
 
-	FunctionTable = *(void***)0x142E6F6B0;
+	FunctionTable = *(void***)0x142E70150;
 	FunctionTable[FunctionTable_ClearDebugValues] = ClearViewableVariables;
 	FunctionTable[FunctionTable_SetDebugValue] = AddViewableVariable;
 }
