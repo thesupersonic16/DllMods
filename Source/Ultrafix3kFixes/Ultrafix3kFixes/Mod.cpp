@@ -169,8 +169,8 @@ struct ControllerState
 };
 
 // Too lazy to sig scan these
-ObjectZone** Zone = (ObjectZone**)0x143DB5240;
-ControllerState* controllers = (ControllerState*)0x143728FF0;
+ObjectZone** Zone = (ObjectZone**)0x143DB5CE0;
+ControllerState* controllers = (ControllerState*)0x143729A90;
 
 HOOK(void, __fastcall, Player_State_KnuxGlideLeft, SigPlayer_State_KnuxGlideLeft(), EntityPlayer* _this)
 {
