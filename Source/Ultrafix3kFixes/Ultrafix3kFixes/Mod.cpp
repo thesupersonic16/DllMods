@@ -241,16 +241,20 @@ HOOK(bool *, __fastcall, sub_1403A2550, Sigsub_1403A2550(), uint32 deviceID)
     return inputs;
 }
 
-extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
+extern "C" __declspec(dllexport) void Init(ModInfo * modInfo)
 {
-	// Check signatures
-	if (!SigValid)
-	{
-		MessageBoxW(nullptr, L"Signature Scan Failed!\n\nThis usually means there is a conflict or the mod is running on an incompatible game version.", L"Scan Error", MB_ICONERROR);
-		return;
-	}
+    // Check signatures
+    if (!SigValid)
+    {
+        MessageBoxW(nullptr, L"Signature Scan Failed!\n\nThis usually means there is a conflict or the mod is running on an incompatible game version.", L"Scan Error", MB_ICONERROR);
+        return;
+    }
 
-	INSTALL_HOOK(Player_State_KnuxGlideLeft);
+    INSTALL_HOOK(Player_State_KnuxGlideLeft);
     INSTALL_HOOK(sub_1401EA5E0);
     INSTALL_HOOK(sub_1403A2550);
+
+    // Fix SpecialClear
+    for (int i = 0; i < 2; ++i)
+        WRITE_MEMORY(((intptr_t)SigSpecialClear_State_FigureOutWhatToDoNext_D0() + 14 * i), 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90);
 }
