@@ -257,4 +257,6 @@ extern "C" __declspec(dllexport) void Init(ModInfo * modInfo)
     // Fix SpecialClear
     for (int i = 0; i < 2; ++i)
         WRITE_MEMORY(((intptr_t)SigSpecialClear_State_FigureOutWhatToDoNext_D0() + 14 * i), 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90);
+    // Fix Amy's jumpOffset
+    WRITE_MEMORY(((char*)SigPlayer_Create_266() + 8), 0x04);
 }

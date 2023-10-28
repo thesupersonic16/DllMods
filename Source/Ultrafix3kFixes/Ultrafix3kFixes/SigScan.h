@@ -8,3 +8,4 @@ extern void* SigCamera_ShakeScreen();
 extern void* Sigsub_1403A2550();
 extern void* SigIsMirrorMode();
 extern void* SigSpecialClear_State_FigureOutWhatToDoNext_D0();
+extern void* SigPlayer_Create_266();
