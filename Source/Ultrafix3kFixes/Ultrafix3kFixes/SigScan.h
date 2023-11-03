@@ -10,3 +10,8 @@ extern void* SigIsMirrorMode();
 extern void* SigSpecialClear_State_FigureOutWhatToDoNext_D0();
 extern void* SigPlayer_Create_266();
 extern void* SigActClear_Create();
+extern void* Sigsub_140302180();
+extern void* SigS3K_CompElement_Draw();
+extern void* SigS3K_CompElement_State_Carousel();
+extern void* SigS3K_CompElement_Create();
+extern void* SigLevelSelect_State_Navigate();

@@ -4,6 +4,12 @@
 #include "SigScan.h"
 #include "Game.h"
 
+struct VectorInt
+{
+    int* start;
+    int* end;
+};
+
 // Too lazy to sig scan these
 ObjectZone** Zone = (ObjectZone**)0x143DB5CE0;
 ControllerState* controllers = (ControllerState*)0x143729A90;
@@ -113,6 +119,85 @@ HOOK(void, __fastcall, ActClear_Create, SigActClear_Create(), EntityActClear* se
     }
 }
 
+HOOK(int, __fastcall, sub_140302180, Sigsub_140302180(), int index)
+{
+    originalsub_140302180(index);
+
+    char* globals_ptr = *(char**)0x144000210;
+    bool hasPlus = *(bool32*)(globals_ptr + 0x4C350C);
+    bool isAnniversary = *(bool32*)(globals_ptr + 0x4C3510);
+    auto vec = (VectorInt*)0x143FB9F88;
+    
+    if (hasPlus && isAnniversary)
+    {
+        vec->end = vec->start + 4;
+        vec->start[0] = 0;
+        vec->start[1] = 1;
+        vec->start[2] = 3;
+        vec->start[3] = 2;
+    }
+    else
+    {
+        vec->end = vec->start + 3;
+        vec->start[0] = 0;
+        vec->start[1] = 1;
+        vec->start[2] = 2;
+    }
+
+    return vec->start[index];
+}
+
+HOOK(void, __fastcall, S3K_CompElement_Draw, SigS3K_CompElement_Draw(), __int64 a1)
+{
+    char* globals_ptr = *(char**)0x144000210;
+    bool* hasPlus = (bool*)(globals_ptr + 0x4C350C);
+    bool* isAnniversary = (bool*)(globals_ptr + 0x4C3510);
+    bool temp = *hasPlus;
+
+    // Reuse hasPlus
+    *hasPlus = (temp && *isAnniversary);
+    originalS3K_CompElement_Draw(a1);
+    *hasPlus = temp;
+}
+
+HOOK(void, __fastcall, S3K_CompElement_State_Carousel, SigS3K_CompElement_State_Carousel(), __int64 a1)
+{
+    char* globals_ptr = *(char**)0x144000210;
+    bool* hasPlus = (bool*)(globals_ptr + 0x4C350C);
+    bool* isAnniversary = (bool*)(globals_ptr + 0x4C3510);
+    bool temp = *hasPlus;
+
+    // Reuse hasPlus
+    *hasPlus = (temp && *isAnniversary);
+    originalS3K_CompElement_State_Carousel(a1);
+    *hasPlus = temp;
+}
+
+HOOK(void, __fastcall, S3K_CompElement_Create, SigS3K_CompElement_Create(), __int64 a1)
+{
+    char* globals_ptr = *(char**)0x144000210;
+    bool* hasPlus = (bool*)(globals_ptr + 0x4C350C);
+    bool* isAnniversary = (bool*)(globals_ptr + 0x4C3510);
+    bool temp = *hasPlus;
+
+    // Reuse hasPlus
+    *hasPlus = (temp && *isAnniversary);
+    originalS3K_CompElement_Create(a1);
+    *hasPlus = temp;
+}
+
+HOOK(void, __fastcall, LevelSelect_State_Navigate, SigLevelSelect_State_Navigate(), __int64 a1)
+{
+    char* globals_ptr = *(char**)0x144000210;
+    bool* hasPlus = (bool*)(globals_ptr + 0x4C350C);
+    bool* isAnniversary = (bool*)(globals_ptr + 0x4C3510);
+    bool temp = *hasPlus;
+
+    // Reuse hasPlus
+    *hasPlus = (temp && *isAnniversary);
+    originalLevelSelect_State_Navigate(a1);
+    *hasPlus = temp;
+}
 
 extern "C" __declspec(dllexport) void Init(ModInfo * modInfo)
 {
@@ -127,6 +212,11 @@ extern "C" __declspec(dllexport) void Init(ModInfo * modInfo)
     INSTALL_HOOK(sub_1401EA5E0);
     INSTALL_HOOK(sub_1403A2550);
     INSTALL_HOOK(ActClear_Create);
+    INSTALL_HOOK(sub_140302180);
+    INSTALL_HOOK(S3K_CompElement_Draw);
+    INSTALL_HOOK(S3K_CompElement_State_Carousel);
+    INSTALL_HOOK(S3K_CompElement_Create);
+    INSTALL_HOOK(LevelSelect_State_Navigate);
 
     // Fix SpecialClear
     for (int i = 0; i < 2; ++i)
