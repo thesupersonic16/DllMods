@@ -1,3 +1,6 @@
+## OriginsPlayerPatcher (1.4)
+- Changed when hooks are installed
+
 ## OriginsPlayerPatcher (1.3)
 - Added palette loading for underwater Knuckles for HCZ and ICZ
   - This update loads `SuperKnuxPalette_WaterHCZ.act` and `SuperKnuxPalette_WaterICZ.act`
