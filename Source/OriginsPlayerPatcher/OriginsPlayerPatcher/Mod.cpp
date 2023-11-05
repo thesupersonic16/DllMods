@@ -151,6 +151,15 @@ HOOK(ObjectPlayer*, __fastcall, Player_StaticLoad, SigPlayer_StaticLoad(), Objec
 	return playerVars;
 }
 
+extern "C" __declspec(dllexport) void PostInit()
+{
+	// Install hooks
+	INSTALL_HOOK(Player_StaticLoad);
+
+	// Specific zone palettes
+	INSTALL_HOOK(HCZSetup_StageLoad);
+	INSTALL_HOOK(ICZSetup_StageLoad);
+}
 
 extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
 {
@@ -168,12 +177,6 @@ extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
 		MessageBoxW(nullptr, L"Signature Scan Failed!\n\nThis usually means there is a conflict or the mod is running on an incompatible game version.", L"Scan Error", MB_ICONERROR);
 		return;
 	}
-
-	INSTALL_HOOK(Player_StaticLoad);
-
-	// Specific zone palettes
-	INSTALL_HOOK(HCZSetup_StageLoad);
-	INSTALL_HOOK(ICZSetup_StageLoad);
 
 	ModLoaderData = modInfo->ModLoader;
 }
