@@ -1,6 +1,7 @@
 #pragma once
 
 extern bool SigValid;
+extern const char* InvalidSig;
 
 extern void* SigPlayer_State_KnuxGlideLeft();
 extern void* Sigsub_1401EA5E0();
@@ -15,3 +16,8 @@ extern void* SigS3K_CompElement_Draw();
 extern void* SigS3K_CompElement_State_Carousel();
 extern void* SigS3K_CompElement_Create();
 extern void* SigLevelSelect_State_Navigate();
+extern void* SigPlayer_State_Roll();
+extern void* SigPlayer_State_Air();
+extern void* SigStartGameObjects_0F();
+extern void* SigPlayer_StaticLoad();
+extern void* SigShield_State_Insta();

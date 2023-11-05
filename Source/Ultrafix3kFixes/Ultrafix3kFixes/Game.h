@@ -40,6 +40,22 @@ enum GameModes
     MODE_TIMEATTACK = 0x2
 };
 
+enum VariableTypes : uint8
+{
+    VAR_UINT8 = 0x0,
+    VAR_UINT16 = 0x1,
+    VAR_UINT32 = 0x2,
+    VAR_INT8 = 0x3,
+    VAR_INT16 = 0x4,
+    VAR_INT32 = 0x5,
+    VAR_ENUM = 0x6,
+    VAR_BOOL = 0x7,
+    VAR_STRING = 0x8,
+    VAR_VECTOR2 = 0x9,
+    VAR_FLOAT = 0xA,
+    VAR_COLOR = 0xB,
+};
+
 
 // RSDKv5 Structures
 struct Animator
@@ -132,10 +148,11 @@ struct EntityCamera : Entity
 
 struct EntityPlayer : Entity
 {
-    char padding0[160];
+    char padding0[144];
     StateMachine state;
     StateMachine nextAirState;
     StateMachine nextGroundState;
+    char padding1[16];
     EntityCamera* camera;
     Animator animator;
     Animator tailAnimator;
@@ -262,6 +279,19 @@ struct EntityActClear
     // ...
 };
 
+struct EntityShield
+{
+    Entity entity;
+    EntityPlayer* player;
+    StateMachine state;
+    int32 type;
+    int32 timer;
+    int32 frameFlags;
+    bool32 forceVisible;
+    Animator shieldAnimator;
+    Animator fxAnimator;
+};
+
 struct GlobalVariables
 {
     GameModes gameMode;
@@ -285,4 +315,25 @@ struct GlobalVariables
     int competitionSession[16384];
     int medalMods;
     // ...
+};
+
+struct FunctionTable
+{
+    void(__fastcall* RegisterGlobalVariables)(void** globals, int32 size, void(__stdcall* initCB)(void* globals));
+    void(__fastcall* RegisterObject)(void** staticVars, const char* name, uint32 entityClassSize, uint32 staticClassSize, void(__stdcall* update)(), void(__stdcall* lateUpdate)(), void(__stdcall* staticUpdate)(), void(__stdcall* draw)(), void(__stdcall* create)(void*), void(__stdcall* stageLoad)(), void(__stdcall* editorDraw)(), void(__stdcall* editorLoad)(), void(__stdcall* serialize)(), void(__stdcall* staticLoad)(void*));
+    void(__fastcall* RegisterStaticVariables)(void** staticVars, const char* name, uint32 classSize);
+    bool32(__fastcall* GetActiveEntities)(uint16 group, Entity** entity);
+    bool32(__fastcall* GetAllEntities)(uint16 classID, Entity** entity);
+    void(__fastcall* BreakForeachLoop)();
+    void(__fastcall* SetEditableVar)(VariableTypes type, const char* name, uint8 classID, int32 offset);
+    Entity* (__fastcall* GetEntity)(uint16 slot);
+    int32(__fastcall* GetEntitySlot)(Entity* entity);
+    int32(__fastcall* GetEntityCount)(uint16 classID, bool32 isActive);
+    // ...
+};
+
+struct ObjectPlayer
+{
+    char padding0[0x1174];
+    int32 playerCount;
 };

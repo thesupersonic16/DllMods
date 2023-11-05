@@ -15,6 +15,15 @@ ObjectZone** Zone = (ObjectZone**)0x143DB5CE0;
 ControllerState* controllers = (ControllerState*)0x143729A90;
 SceneInfo* sceneInfo = (SceneInfo*)0x143DB14E0;
 GlobalVariables* globals = (GlobalVariables*)0x144000210;
+const char** CurrentStateName = (const char**)0x142E8C1D0; // Not important
+FunctionTable* RSDK;
+ObjectPlayer* Player;
+
+HOOK(ObjectPlayer*, __fastcall, Player_StaticLoad, SigPlayer_StaticLoad(), ObjectPlayer* playerVars)
+{
+    Player = playerVars;
+    return originalPlayer_StaticLoad(playerVars);
+}
 
 HOOK(void, __fastcall, Player_State_KnuxGlideLeft, SigPlayer_State_KnuxGlideLeft(), EntityPlayer* _this)
 {
@@ -199,15 +208,52 @@ HOOK(void, __fastcall, LevelSelect_State_Navigate, SigLevelSelect_State_Navigate
     *hasPlus = temp;
 }
 
-extern "C" __declspec(dllexport) void Init(ModInfo * modInfo)
+void Player_State_RollAir(EntityPlayer* self)
 {
-    // Check signatures
-    if (!SigValid)
-    {
-        MessageBoxW(nullptr, L"Signature Scan Failed!\n\nThis usually means there is a conflict or the mod is running on an incompatible game version.", L"Scan Error", MB_ICONERROR);
-        return;
-    }
+    *CurrentStateName = "State_RollAir";
+    auto Player_State_Air = (void(__fastcall*)(EntityPlayer* self))SigPlayer_State_Air();
 
+    // Get Shield entity
+    int32 playerSlot = RSDK->GetEntitySlot(self);
+    auto shield = (EntityShield*)RSDK->GetEntity(playerSlot + Player->playerCount);
+
+    // Disable left and right inputs
+    self->left = false;
+    self->right = false;
+
+    // Run Air state
+    Player_State_Air(self);
+
+    // Switch to Player_State_Air once player used the instashield
+    if (shield->state.state == SigShield_State_Insta())
+        self->state.state = (void(__fastcall*)())Player_State_Air;
+}
+
+HOOK(void, __fastcall, Player_State_Roll, SigPlayer_State_Roll(), EntityPlayer* self)
+{
+    char* globals_ptr = *(char**)0x144000210;
+    bool* isAnniversary = (bool*)(globals_ptr + 0x4C3510);
+
+    originalPlayer_State_Roll(self);
+
+    if (!*isAnniversary && self->jumpPress && self->state.state == SigPlayer_State_Air())
+    {
+        self->state.state = (void(__fastcall*)())Player_State_RollAir;
+        self->nextAirState.state = (void(__fastcall*)())Player_State_RollAir;
+    }
+}
+
+HOOK(void, __fastcall, StartGameObjects, ((intptr_t)SigStartGameObjects_0F() - 0x0F))
+{
+    originalStartGameObjects();
+
+    RSDK = *(FunctionTable**)0x142E70150;
+}
+
+extern "C" __declspec(dllexport) void PostInit()
+{
+    // Install hooks
+    INSTALL_HOOK(Player_StaticLoad);
     INSTALL_HOOK(Player_State_KnuxGlideLeft);
     INSTALL_HOOK(sub_1401EA5E0);
     INSTALL_HOOK(sub_1403A2550);
@@ -217,10 +263,43 @@ extern "C" __declspec(dllexport) void Init(ModInfo * modInfo)
     INSTALL_HOOK(S3K_CompElement_State_Carousel);
     INSTALL_HOOK(S3K_CompElement_Create);
     INSTALL_HOOK(LevelSelect_State_Navigate);
+    INSTALL_HOOK(Player_State_Roll);
+    INSTALL_HOOK(StartGameObjects);
 
     // Fix SpecialClear
     for (int i = 0; i < 2; ++i)
         WRITE_MEMORY(((intptr_t)SigSpecialClear_State_FigureOutWhatToDoNext_D0() + 14 * i), 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90);
     // Fix Amy's jumpOffset
     WRITE_MEMORY(((char*)SigPlayer_Create_266() + 8), 0x04);
+}
+
+extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
+{
+    // Scan signatures
+    SigPlayer_State_KnuxGlideLeft();
+    Sigsub_1401EA5E0();
+    SigCamera_ShakeScreen();
+    Sigsub_1403A2550();
+    SigIsMirrorMode();
+    SigSpecialClear_State_FigureOutWhatToDoNext_D0();
+    SigPlayer_Create_266();
+    SigActClear_Create();
+    Sigsub_140302180();
+    SigS3K_CompElement_Draw();
+    SigS3K_CompElement_State_Carousel();
+    SigS3K_CompElement_Create();
+    SigLevelSelect_State_Navigate();
+    SigPlayer_State_Roll();
+    SigPlayer_State_Air();
+    SigStartGameObjects_0F();
+    SigPlayer_StaticLoad();
+    SigShield_State_Insta();
+
+    // Check signatures
+    if (!SigValid)
+    {
+        MessageBoxA(nullptr, InvalidSig, "", NULL);
+        MessageBoxW(nullptr, L"Signature Scan Failed!\n\nThis usually means there is a conflict or the mod is running on an incompatible game version.", L"Scan Error", MB_ICONERROR);
+        return;
+    }
 }
