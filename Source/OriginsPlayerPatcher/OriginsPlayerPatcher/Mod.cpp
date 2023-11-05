@@ -171,6 +171,11 @@ extern "C" __declspec(dllexport) void Init(ModInfo* modInfo)
 		return;
 	}
 
+	// Scan signatures
+	SigPlayer_StaticLoad();
+	SigHCZSetup_StageLoad();
+	SigICZSetup_StageLoad();
+
 	// Check signatures
 	if (!SigValid)
 	{
