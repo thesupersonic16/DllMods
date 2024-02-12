@@ -1,3 +1,5 @@
+## RSDKv5u-Origins (1.3.1)
+- Fixed mod loader not updating.
 
 ## RSDKv5u-Origins (1.3.0)
 - Fixed mirror mode.
@@ -12,6 +14,3 @@
 ## RSDKv5u-Origins (1.2.0)
 - Fixed tile deformation.
  - This fixes the visual glitches in the LRZ boss scene.
-
-## RSDKv5u-Origins (1.1.1)
-- Added more debug flags.
