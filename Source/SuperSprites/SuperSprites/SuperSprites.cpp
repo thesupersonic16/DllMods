@@ -7,11 +7,12 @@
 extern "C"
 {
     __declspec(dllexport) const HelperFunctions* MML_HelperFunctions = nullptr;
-    
-    bool TailsEnabled  = false;
-    bool KnuxEnabled   = false;
+
+    bool TailsEnabled = false;
+    bool TailsTailsEnabled = false;
+    bool KnuxEnabled = false;
     bool MightyEnabled = false;
-    bool RayEnabled    = false;
+    bool RayEnabled = false;
 
     short GetSuperAnimation(SonicMania::EntityPlayer* player)
     {
@@ -22,6 +23,8 @@ extern "C"
         case SonicMania::Character_Tails:
             if (TailsEnabled)
                 return SonicMania::LoadAnimation("Players/SuperTails.bin", SonicMania::Scope::Scope_Stage);
+            if (TailsTailsEnabled)
+                return SonicMania::LoadAnimation("Players/SuperTailSprite.bin", SonicMania::Scope::Scope_Stage);
             break;
         case SonicMania::Character_Knux:
             if (KnuxEnabled)
@@ -41,6 +44,20 @@ extern "C"
         return -1;
     }
 
+    short GetSuperTailAnimation(SonicMania::EntityPlayer* player)
+    {
+        switch (player->Character)
+        {
+        case SonicMania::Character_Tails:
+            if (TailsTailsEnabled)
+                return SonicMania::LoadAnimation("Players/SuperTailSprite.bin", SonicMania::Scope::Scope_Stage);
+            break;
+        default:
+            break;
+        }
+        return -1;
+    }
+
     void SetupSuperSprites(SonicMania::EntityPlayer* player)
     {
         if (!player->Transforming)
@@ -53,6 +70,8 @@ extern "C"
             case SonicMania::Character_Tails:
                 if (TailsEnabled)
                     player->SpriteIndex = SonicMania::LoadAnimation("Players/SuperTails.bin", SonicMania::Scope::Scope_Stage);
+                if (TailsTailsEnabled)
+                    player->SpriteIndexTails = SonicMania::LoadAnimation("Players/SuperTailSprite.bin", SonicMania::Scope::Scope_Stage);
                 break;
             case SonicMania::Character_Knux:
                 if (KnuxEnabled)
@@ -77,6 +96,7 @@ extern "C"
         if (!player->Transforming)
         {
             short spriteIndex = 0;
+            short spriteIndexTails = 0;
             switch (player->Character)
             {
             case SonicMania::Character_Sonic:
@@ -85,6 +105,8 @@ extern "C"
             case SonicMania::Character_Tails:
                 if (TailsEnabled)
                     spriteIndex = SonicMania::GetSpritePointer(0xAC6838, 0xA0C);
+                if (TailsTailsEnabled)
+                    spriteIndexTails = SonicMania::GetSpritePointer(0xAC6838, 0xA0E);
                 break;
             case SonicMania::Character_Knux:
                 if (KnuxEnabled)
@@ -108,6 +130,13 @@ extern "C"
                     player->Animation.CurrentFrame = 0;
                 SonicMania::SetSpriteAnimation(player->SpriteIndex, player->Animation.CurrentAnimation, &player->Animation, 1, player->Animation.CurrentFrame);
             }
+            if (spriteIndexTails)
+            {
+                player->SpriteIndexTails = spriteIndexTails;
+                if (!player->Animation.CurrentAnimation)
+                    player->Animation.CurrentFrame = 0;
+                SonicMania::SetSpriteAnimation(player->SpriteIndexTails, player->Animation.CurrentAnimation, &player->Animation, 1, player->Animation.CurrentFrame);
+            }
         }
     }
 
@@ -116,14 +145,16 @@ extern "C"
 
     int EnforceSuperAnimations()
     {
-	    auto player = *CurrentPlayer;
+        auto player = *CurrentPlayer;
         //printf("EnforceSuperAnimations: IsSuper? %s\n", player->SuperState == SonicMania::SuperState_Active ? "Yes" : "No");
         if (player->SuperState == SonicMania::SuperState_Active)
         {
             short superSpriteIndex = GetSuperAnimation(player);
+            short superSpriteIndexTails = GetSuperTailAnimation(player);
             //printf("EnforceSuperAnimations: %d\n", superSpriteIndex);
             if (superSpriteIndex != -1)
                 player->SpriteIndex = superSpriteIndex;
+                player->SpriteIndexTails = superSpriteIndexTails;
         }
         return sub_4CAD80();
     }
@@ -134,13 +165,14 @@ extern "C"
         if (MML_HelperFunctions)
         {
             TailsEnabled = MML_HelperFunctions->CheckFile("Data/Sprites/Players/SuperTails.bin");
+            TailsTailsEnabled = MML_HelperFunctions->CheckFile("Data/Sprites/Players/SuperTailSprite.bin");
             KnuxEnabled = MML_HelperFunctions->CheckFile("Data/Sprites/Players/SuperKnux.bin");
             MightyEnabled = MML_HelperFunctions->CheckFile("Data/Sprites/Players/SuperMighty.bin");
             RayEnabled = MML_HelperFunctions->CheckFile("Data/Sprites/Players/SuperRay.bin");
         }
         else
         {
-            MessageBoxA(NULL, "SuperSprites was compiled with the AUTOCONFIG macro\n which requires a later version of the modloader\n Please update the modloader before continuing.", "SuperSprites Error", MB_ICONERROR);
+            MessageBoxA(NULL, "SuperSpritesV2 was compiled with the AUTOCONFIG macro\n which requires a later version of the modloader\n Please update the modloader before continuing.", "SuperSpritesV2 Error", MB_ICONERROR);
         }
 #endif // AUTOCONFIG
     }
@@ -148,7 +180,7 @@ extern "C"
     __declspec(dllexport) void Init(const char* path)
     {
         // Setup
-        BYTE patch[] { 0x83, 0xC4, 0x04, 0xEB, 0x1A };
+        BYTE patch[]{ 0x83, 0xC4, 0x04, 0xEB, 0x1A };
         WriteData((BYTE*)(baseAddress + 0x000C84D0), (BYTE)0x56);        // push esi - player
         WriteCall((void*)(baseAddress + 0x000C84D1), SetupSuperSprites); // call SetupSuperSprites
         WriteData((BYTE*)(baseAddress + 0x000C84D6), patch);             // add esi, 4
