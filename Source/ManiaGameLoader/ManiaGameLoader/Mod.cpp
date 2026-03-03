@@ -8,6 +8,8 @@ extern "C"
 {
     HMODULE gameHandle = NULL;
     Platform::PlatformType platform = Platform::PlatformType::Steam;
+    std::map<uint32, void**> objectStaticVars;
+    std::map<uint32, void**> newObjectStaticVars;
 
     void BlankFunc() {}
 
@@ -17,6 +19,8 @@ extern "C"
         for (auto& callbacks : ModAPI::ModCallbacks)
             callbacks.clear();
 
+        objectStaticVars.clear();
+        Platform::GetObjectStaticVars(&objectStaticVars, platform);
         Platform::ResetObjects(platform);
 
         if (!gameHandle)
@@ -62,9 +66,24 @@ extern "C"
         void (*linkGameLogicDLL)(void*) = (void(*)(void*))GetProcAddress(gameHandle, "LinkGameLogicDLL");
 
         if (linkGameLogicDLL)
+        {
             linkGameLogicDLL(&engine);
+
+            Platform::GetObjectStaticVars(&newObjectStaticVars, platform);
+        }
         else
             MessageBoxA(NULL, "Invalid game logic file!", "ManiaGameLoader", MB_ICONERROR | MB_OK);
+    }
+
+    __declspec(dllexport) void OnFrame()
+    {
+        for (auto& pair : objectStaticVars)
+        {
+            auto newIt = newObjectStaticVars.find(pair.first);
+
+            if (newIt != newObjectStaticVars.end() && pair.second && newIt->second)
+                *pair.second = *newIt->second;
+        }
     }
 
     __declspec(dllexport) void Init(const char* path)

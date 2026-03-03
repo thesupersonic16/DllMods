@@ -66,6 +66,32 @@ namespace Platform
         }
     }
 
+    void GetObjectStaticVars(std::map<uint32, void**>* vars, PlatformType platform)
+    {
+        uint16 objectCount = 0;
+        void** staticVarBase = 0;
+        switch (platform)
+        {
+        default:
+        case PlatformType::Steam:
+            objectCount = *((uint16*)ASLR(0x0083D56C));
+            staticVarBase = (void**)ASLR(0x00E78F68);
+            break;
+        case PlatformType::Epic:
+            objectCount = *((uint16*)ASLR(0x00AA55C8));
+            staticVarBase = (void**)ASLR(0x00E31A40);
+            break;
+        }
+
+        for (uint16 i = 0; i < objectCount; i++)
+        {
+            uint32* hash = (uint32*)(staticVarBase + i * 16 + 0);
+            void*** staticVars = (void***)(staticVarBase + i * 16 + 13);
+            if (hash && staticVars)
+                (*vars)[*hash] = *staticVars;
+        }
+    }
+
     void ResetObjects(PlatformType platform)
     {
         // Sets object count to 2
